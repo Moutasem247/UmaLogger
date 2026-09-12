@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Log Generator</title>
+    <!-- Libraries for Exporting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        :root {
+            --text-brown: #6b3518;
+            --border-gray: #e0e0e0;
+            --line-gray: #f0f0f0;
+            --bg-color: #f7f7f7;
+            --uma-pink: #f77098;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e4e4e4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+
+        h2, h3 { margin-top: 0; color: #333; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .form-group input[type="number"], .form-group input[type="text"], .form-group select {
+            width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
+        }
+
+        button {
+            background: #4CAF50; color: white; border: none; padding: 10px 15px; 
+            cursor: pointer; border-radius: 4px; font-weight: bold; margin-right: 5px;
+        }
+        button:hover { background: #45a049; }
+        
+        .btn-secondary { background: #2196F3; }
+        .btn-secondary:hover { background: #0b7dda; }
+
+        .btn-narration { background: #9E9E9E; }
+        .btn-narration:hover { background: #757575; }
+
+        .character-setup {
+            border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; background: #fafafa;
+        }
+
+        /* --- Rich Text Editor Styles --- */
+        .toolbar {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            background: #f1f1f1;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            align-items: center;
+        }
+        .toolbar button {
+            background: white; color: black; border: 1px solid #ccc; padding: 5px 10px;
+            margin: 0; font-size: 16px; border-radius: 3px; cursor: pointer;
+        }
+        .toolbar button:hover { background: #e0e0e0; }
+        .toolbar input[type="color"] {
+            padding: 0; width: 32px; height: 32px; border: none; cursor: pointer; background: none;
+        }
+        
+        .rich-textarea {
+            width: 100%; min-height: 80px; padding: 10px; box-sizing: border-box; 
+            border: 1px solid #ccc; border-radius: 4px; background: white;
+            font-family: inherit; font-size: 1em; overflow-y: auto; color: var(--text-brown);
+        }
+        .rich-textarea:focus { outline: 2px solid #4CAF50; border-color: transparent; }
+
+        /* --- Inline Toolbar for Edit Mode --- */
+        .inline-toolbar {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            background: #e8f5e9;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px dashed #4CAF50;
+            align-items: center;
+        }
+        .inline-toolbar button {
+            background: white; color: black; border: 1px solid #ccc; padding: 3px 8px;
+            margin: 0; font-size: 14px; border-radius: 3px; cursor: pointer;
+        }
+        .inline-toolbar button:hover { background: #e0e0e0; }
+        .inline-toolbar input[type="color"] {
+            padding: 0; width: 26px; height: 26px; border: none; cursor: pointer; background: none;
+        }
+
+        /* --- Game UI Export Area Styles --- */
+        #chat-export-area {
+            background-color: var(--bg-color);
+            width: 100%;
+            max-width: 450px;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Exact Green Header Match */
+        .game-header {
+            position: relative;
+            background: linear-gradient(to bottom, #a7e436 0%, #89cf29 50%, #6fb917 100%);
+            color: white;
+            text-align: center;
+            font-weight: 800;
+            font-size: 1.25em;
+            letter-spacing: 0.5px;
+            padding: 10px 0;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0,0,0,0.15);
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        /* Repeating Grid Pattern Overlay matching the reference screenshot */
+        .game-header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.12) 0, rgba(255, 255, 255, 0.12) 6px, transparent 0, transparent 12px),
+                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0, rgba(255, 255, 255, 0.12) 6px, transparent 0, transparent 12px);
+            background-size: 24px 24px;
+            /* Fades out pattern towards the right side */
+            mask-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0) 65%);
+            -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0) 65%);
+            pointer-events: none;
+        }
+
+        /* Content Body Wrapper */
+        .game-body {
+            position: relative;
+            padding: 20px 15px 30px 15px;
+            flex-grow: 1;
+            background-color: white;
+            min-height: 400px;
+        }
+        
+        /* Decorative Scrollbar matching the UI */
+        .scroll-bar {
+            position: absolute;
+            top: 90px;
+            bottom: 90px;
+            right: 5px;
+            width: 5px;
+            background-color: rgba(130, 128, 140, 0.7);
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Event Banner */
+        .event-banner-container {
+            position: relative;
+            margin-bottom: 25px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .event-square-img {
+            width: 55px;
+            height: 55px;
+            border: 2px solid #ecd3a5;
+            border-radius: 8px;
+            background-color: white;
+            padding: 2px;
+            position: absolute;
+            left: 0;
+            top: -12px;
+            z-index: 5;
+            object-fit: cover;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .event-banner {
+            background-color: var(--uma-pink);
+            flex-grow: 1;
+            box-sizing: border-box;
+            margin-left: 15px;
+            padding: 8px 15px 8px 50px; 
+            border-radius: 6px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .event-chevron {
+            background: white;
+            color: #888;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Chat Messages Container */
+        #chat-messages-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chat-row {
+            display: flex;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        /* Shape Classes for Dynamic Images */
+        .shape-circle {
+            border-radius: 50% !important;
+        }
+        
+        .shape-rounded-square {
+            border-radius: 8px !important;
+        }
+
+        /* Avatars */
+        .avatar {
+            width: 55px;
+            height: 55px;
+            object-fit: cover;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            background-color: #f0f0f0;
+            flex-shrink: 0;
+            z-index: 2;
+        }
+
+        /* Message Bubble */
+        .message-bubble {
+            position: relative;
+            background: white;
+            border: 1px solid var(--border-gray);
+            border-radius: 8px;
+            margin-left: 12px;
+            padding: 10px 15px;
+            flex-grow: 1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+
+        .message-bubble::before, .message-bubble::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+        .message-bubble::before {
+            left: -8px; 
+            border-width: 6px 8px 6px 0;
+            border-color: transparent var(--border-gray) transparent transparent;
+        }
+        .message-bubble::after {
+            left: -6px; 
+            border-width: 6px 7px 6px 0;
+            border-color: transparent white transparent transparent;
+        }
+
+        /* Narration Bubble */
+        .narration-bubble {
+            background: white;
+            border: 1px solid var(--border-gray);
+            border-radius: 8px;
+            margin-left: 12px;
+            padding: 12px 15px;
+            flex-grow: 1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            text-align: left; 
+        }
+
+        .character-name {
+            color: var(--text-brown);
+            font-weight: 800;
+            font-size: 0.95em;
+            margin-bottom: 6px;
+            padding: 2px;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: var(--line-gray);
+            margin-bottom: 8px;
+        }
+
+        .message-text {
+            color: var(--text-brown);
+            font-weight: 700; 
+            font-size: 0.95em;
+            line-height: 1.4;
+            word-wrap: break-word;
+            padding: 2px;
+        }
+        .message-text b, .message-text strong {
+            font-weight: 900;
+        }
+
+        /* Fake Close Button */
+        .close-btn-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            margin-bottom: 10px;
+        }
+        .fake-close-btn {
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+            border: 1px solid #d4d4d4;
+            color: var(--text-brown);
+            font-weight: bold;
+            font-size: 1.1em;
+            padding: 10px 60px;
+            border-radius: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+
+        /* --- Action & Edit Buttons --- */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-left: 10px;
+            opacity: 0.2;
+            transition: opacity 0.2s;
+            align-self: center;
+            position: absolute;
+            right: -35px;
+        }
+        .chat-row:hover .action-buttons { opacity: 1; }
+
+        .action-btn {
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+        }
+        .action-btn.delete { background-color: #ff4d4d; font-weight: bold; }
+        .action-btn.delete:hover { background-color: #e60000; }
+        
+        .action-btn.edit { background-color: #4CAF50; font-size: 14px; }
+        .action-btn.edit:hover { background-color: #45a049; }
+        
+        .action-btn.save { background-color: #2196F3; font-size: 14px; }
+        .action-btn.save:hover { background-color: #0b7dda; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Step 1: Setup Event & Characters -->
+    <div class="controls-container" id="step-1">
+        <h2>Step 1: Setup Event & Characters</h2>
+        
+        <div class="form-group" style="background: #f9f9f9; padding: 15px; border-radius: 4px; border: 1px solid #ddd;">
+            <label>Event / Story Name (Text on Pink Banner):</label>
+            <input type="text" id="event-name-input" placeholder="e.g., Fan Letter" value="Fan Letter">
+            
+            <label style="margin-top: 10px;">Event Thumbnail Image:</label>
+            <input type="file" id="event-img-input" accept="image/*">
+        </div>
+
+        <div class="form-group">
+            <label>How many characters are chatting?</label>
+            <input type="number" id="num-chars" min="1" max="10" value="3">
+        </div>
+        <button onclick="generateCharacterInputs()">Next</button>
+    </div>
+
+    <!-- Step 2: Character Details -->
+    <div class="controls-container" id="step-2" style="display: none;">
+        <h2>Step 2: Character Details</h2>
+        <div id="character-inputs-container"></div>
+        <button onclick="startChat()">Start Chatting</button>
+        <button class="btn-secondary" onclick="location.reload()">Back</button>
+    </div>
+
+    <!-- Step 3: Chat Creation Interface -->
+    <div class="controls-container" id="step-3" style="display: none;">
+        <h2>Step 3: Create Chat Log</h2>
+        <div class="form-group">
+            <label>Who is talking?</label>
+            <select id="talker-select"></select>
+        </div>
+        <div class="form-group">
+            <label>Message:</label>
+            
+            <div class="toolbar">
+                <button type="button" onmousedown="event.preventDefault(); formatText('bold')" title="Bold"><b>B</b></button>
+                <button type="button" onmousedown="event.preventDefault(); formatText('italic')" title="Italic"><i>I</i></button>
+                <input type="color" id="textColor" title="Text Color" value="#6b3518" onchange="formatText('foreColor', this.value)">
+            </div>
+            
+            <div id="message-input" contenteditable="true" class="rich-textarea"></div>
+        </div>
+        
+        <button onclick="addMessage()">Add Message</button>
+        <button class="btn-narration" onclick="addNarration()">Add Narration</button>
+        
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
+        <h3>Export Options</h3>
+        <button class="btn-secondary" onclick="exportToPNG()">Export as PNG</button>
+        <button class="btn-secondary" onclick="exportToPDF()">Export as PDF</button>
+    </div>
+
+    <!-- The actual game UI log that will be exported -->
+    <div id="chat-export-area" style="display: none;">
+        <div class="game-header">Log</div>
+        
+        <div class="game-body">
+            <div class="scroll-bar"></div>
+            
+            <div class="event-banner-container">
+                <img id="display-event-img" class="event-square-img shape-rounded-square" alt="Event" src="">
+                <div class="event-banner">
+                    <span id="display-event-name">Event Name</span>
+                    <div class="event-chevron">^</div>
+                </div>
+            </div>
+
+            <div id="chat-messages-container"></div>
+            
+            <div class="close-btn-container">
+                <div class="fake-close-btn">Close</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let characters = [];
+        // Replaced filename with a safe 1x1 transparent Base64 PNG fallback 
+        // to prevent Cross-Origin Resource Sharing (CORS) errors on the canvas export.
+        const DEFAULT_IMAGE_NAME = 'default.png';
+
+        function formatText(command, value = null) {
+            document.execCommand(command, false, value);
+        }
+
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    resolve(DEFAULT_IMAGE_NAME);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function generateCharacterInputs() {
+            const num = document.getElementById('num-chars').value;
+            const container = document.getElementById('character-inputs-container');
+            container.innerHTML = ''; 
+
+            for (let i = 0; i < num; i++) {
+                container.innerHTML += `
+                    <div class="character-setup">
+                        <div class="form-group">
+                            <label>Character ${i + 1} Name:</label>
+                            <input type="text" id="char-name-${i}" placeholder="e.g., Sakura Bakushin O">
+                        </div>
+                        <div class="form-group">
+                            <label>Character ${i + 1} Avatar Image:</label>
+                            <input type="file" id="char-img-${i}" accept="image/*">
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('step-1').style.display = 'none';
+            document.getElementById('step-2').style.display = 'block';
+        }
+
+        async function startChat() {
+            const eventName = document.getElementById('event-name-input').value || 'Log Event';
+            const eventImgFile = document.getElementById('event-img-input').files[0];
+            const eventImgData = await readFileAsDataURL(eventImgFile);
+            
+            document.getElementById('display-event-name').textContent = eventName;
+            
+            const eventImgEl = document.getElementById('display-event-img');
+            eventImgEl.src = eventImgData;
+            
+            // Always assign a rounded square shape for the event header image
+            eventImgEl.classList.remove('shape-circle');
+            eventImgEl.classList.add('shape-rounded-square');
+
+            eventImgEl.onerror = function() {
+                this.onerror = null;
+                this.src = DEFAULT_IMAGE_NAME;
+                this.classList.remove('shape-circle');
+                this.classList.add('shape-rounded-square');
+            };
+
+            const num = document.getElementById('num-chars').value;
+            characters = [];
+            const selectEl = document.getElementById('talker-select');
+            selectEl.innerHTML = '';
+
+            for (let i = 0; i < num; i++) {
+                const name = document.getElementById(`char-name-${i}`).value || `Character ${i+1}`;
+                const fileInput = document.getElementById(`char-img-${i}`);
+                const file = fileInput.files[0];
+                
+                const avatarDataUrl = await readFileAsDataURL(file);
+                const isCustom = (avatarDataUrl !== DEFAULT_IMAGE_NAME);
+                
+                characters.push({ id: i, name, avatarDataUrl, isCustom });
+                
+                const option = document.createElement('option');
+                option.value = i;
+                option.text = name;
+                selectEl.appendChild(option);
+            }
+
+            document.getElementById('step-2').style.display = 'none';
+            document.getElementById('step-3').style.display = 'block';
+            document.getElementById('chat-export-area').style.display = 'flex';
+            document.getElementById('message-input').focus();
+        }
+
+        function toggleEdit(btn) {
+            const row = btn.closest('.chat-row');
+            const msgText = row.querySelector('.message-text');
+            const charName = row.querySelector('.character-name');
+            const isEditing = msgText.contentEditable === "true";
+
+            if (isEditing) {
+                msgText.contentEditable = "false";
+                msgText.style.outline = "none";
+                if (charName) {
+                    charName.contentEditable = "false";
+                    charName.style.outline = "none";
+                }
+
+                const inlineToolbar = row.querySelector('.inline-toolbar');
+                if (inlineToolbar) inlineToolbar.remove();
+
+                btn.innerHTML = "✎";
+                btn.title = "Edit Message";
+                btn.classList.remove('save');
+                btn.classList.add('edit');
+            } else {
+                msgText.contentEditable = "true";
+                msgText.style.outline = "2px dashed #4CAF50";
+                msgText.style.borderRadius = "4px";
+                if (charName) {
+                    charName.contentEditable = "true";
+                    charName.style.outline = "2px dashed #4CAF50";
+                    charName.style.borderRadius = "4px";
+                }
+
+                const toolbarHTML = `
+                    <div class="inline-toolbar" contenteditable="false">
+                        <button type="button" onmousedown="event.preventDefault(); formatText('bold')" title="Bold"><b>B</b></button>
+                        <button type="button" onmousedown="event.preventDefault(); formatText('italic')" title="Italic"><i>I</i></button>
+                        <input type="color" title="Text Color" value="#6b3518" onchange="formatText('foreColor', this.value)">
+                    </div>
+                `;
+                msgText.insertAdjacentHTML('beforebegin', toolbarHTML);
+                msgText.focus();
+                
+                btn.innerHTML = "💾";
+                btn.title = "Save Message";
+                btn.classList.remove('edit');
+                btn.classList.add('save');
+            }
+        }
+
+        function addMessage() {
+            const talkerId = document.getElementById('talker-select').value;
+            const messageEditor = document.getElementById('message-input');
+            const messageHtml = messageEditor.innerHTML;
+            
+            if (!messageEditor.textContent.trim() && !messageHtml.includes('<img')) return;
+
+            const character = characters[talkerId];
+            const chatArea = document.getElementById('chat-messages-container');
+
+            const chatRow = document.createElement('div');
+            chatRow.className = 'chat-row';
+            
+            const shapeClass = character.isCustom ? 'shape-circle' : 'shape-rounded-square';
+            
+            chatRow.innerHTML = `
+                <img src="${character.avatarDataUrl}" alt="${character.name}" class="avatar ${shapeClass}" onerror="this.onerror=null; this.src='${DEFAULT_IMAGE_NAME}'; this.classList.remove('shape-circle'); this.classList.add('shape-rounded-square');">
+                <div class="message-bubble">
+                    <div class="character-name" contenteditable="false">${character.name}</div>
+                    <div class="divider"></div>
+                    <div class="message-text" contenteditable="false">${messageHtml}</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn edit" onclick="toggleEdit(this)" title="Edit Message">✎</button>
+                    <button class="action-btn delete" onclick="this.closest('.chat-row').remove()" title="Delete Message">X</button>
+                </div>
+            `;
+
+            chatArea.appendChild(chatRow);
+            messageEditor.innerHTML = ''; 
+        }
+
+        function addNarration() {
+            const messageEditor = document.getElementById('message-input');
+            const messageHtml = messageEditor.innerHTML;
+            
+            if (!messageEditor.textContent.trim() && !messageHtml.includes('<img')) return;
+
+            const chatArea = document.getElementById('chat-messages-container');
+
+            const chatRow = document.createElement('div');
+            chatRow.className = 'chat-row';
+            
+            chatRow.innerHTML = `
+                <div style="width: 55px; height: 55px; flex-shrink: 0; background: transparent;"></div>
+                <div class="narration-bubble">
+                    <div class="message-text" contenteditable="false">${messageHtml}</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn edit" onclick="toggleEdit(this)" title="Edit Message">✎</button>
+                    <button class="action-btn delete" onclick="this.closest('.chat-row').remove()" title="Delete Message">X</button>
+                </div>
+            `;
+
+            chatArea.appendChild(chatRow);
+            messageEditor.innerHTML = ''; 
+        }
+
+        function exportToPNG() {
+            const target = document.getElementById('chat-export-area');
+            
+            // AllowTaint is removed to stop the canvas from getting blocked during DataURL conversion
+            html2canvas(target, { 
+                backgroundColor: '#e4e4e4',
+                scale: 2, 
+                useCORS: true, 
+                ignoreElements: (element) => 
+                    element.classList.contains('action-buttons') || 
+                    element.classList.contains('inline-toolbar')
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'game_log.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                console.error("Export Error: ", err);
+                alert("Failed to export. Please ensure images are valid.");
+            });
+        }
+
+        function exportToPDF() {
+            const target = document.getElementById('chat-export-area');
+            
+            html2canvas(target, { 
+                backgroundColor: '#e4e4e4', 
+                scale: 2, 
+                useCORS: true, 
+                ignoreElements: (element) => 
+                    element.classList.contains('action-buttons') || 
+                    element.classList.contains('inline-toolbar')
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                
+                // Set PDF document size dynamically to fit the exact length of the canvas
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save('game_log.pdf');
+            }).catch(err => {
+                console.error("Export Error: ", err);
+                alert("Failed to export PDF. Please ensure images are valid.");
+            });
+        }
+    </script>
+</body>
+</html>
